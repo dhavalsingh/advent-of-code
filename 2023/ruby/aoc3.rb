@@ -138,7 +138,6 @@ input = "........936..672.........846.922........359...332......582..856........
 ....*...............*...............&.331...787........48...........224..*......184........874.......=.....*........................537.....
 .....934....*339...829....495.....682...*.............*....+..........*..794..........-430...*....&........848..367....+............*....505
 .........175..........................381............270....198......911...................52......642...............45............445......"
-
 sample = "467..114..
 ...*......
 ..35..633.
@@ -149,8 +148,10 @@ sample = "467..114..
 ......755.
 ...$.*....
 .664.598.."
+
 # Regular expression to match symbols, excluding the dot '.'
 regex = /[^[:alnum:].]+/
+regex_2 = /\*/
 lines = input.split("\n")
 sum = 0
 total_lines = lines.length
@@ -162,40 +163,66 @@ lines.each_with_index do |line, line_index|
   line_length = line.length
   # Regular expression to match sequences of digits or individual non-digit characters
   line.each_char.with_index do |char, char_index|
-    if char =~ regex
+    if char =~ regex_2
       symbol_map[line_index] = (symbol_map[line_index] || []) << char_index
     end
   end
 end
 puts symbol_map
 
-# Now, we iterate over each line again to find and sum the numbers
+# line => [number, [start index... end index]]
+number_map = {}
 lines.each_with_index do |line, line_index|
+  last_index = 0
+  number_map[line_index] = []
   line.scan(/\d+/) do |number|
-    puts number
-    number_start_index = line.index(number)
-    number_end_index = number_start_index + number.length - 1
-
-    # Check if any digit of the number is adjacent to a symbol
-    adjacent_to_symbol = false
-    (number_start_index..number_end_index).each do |index|
-      (-1..1).each do |row_offset|
-        (-1..1).each do |col_offset|
-          next if row_offset == 0 && col_offset == 0
-          adjacent_row = line_index + row_offset
-          adjacent_col = index + col_offset
-          if symbol_map[adjacent_row]&.include?(adjacent_col)
-            adjacent_to_symbol = true
-            break
-          end
-        end
-        break if adjacent_to_symbol
-      end
-      break if adjacent_to_symbol
-    end
-
-    sum += number.to_i if adjacent_to_symbol
+    tmp = []
+    tmp<< number.to_i
+    start_index = line.index(number, last_index)
+    last_index = start_index + number.length
+    final_index = last_index - 1
+    tmp << [start_index, final_index]
+    number_map[line_index] << tmp
   end
 end
 
-puts sum
+def adjacent_to_symbol_sum(symbol, line_index, og_number_map, total_lines)
+  sum = 1
+  number_map = og_number_map.dup
+  count = 0
+  (-1..1).each do |row_offset|
+    (-1..1).each do |col_offset|
+      next if row_offset == 0 && col_offset == 0
+      adjacent_row = line_index + row_offset
+      adjacent_col = symbol + col_offset
+      next if adjacent_row < 0 || adjacent_row >= total_lines || adjacent_col < 0
+
+      number_map[adjacent_row].each do |number_with_index|
+        puts "row: #{adjacent_row} column: #{adjacent_col} for #{number_with_index.inspect}"
+        if number_with_index[1][0] <= adjacent_col && number_with_index[1][1] >= adjacent_col && number_with_index[0]>0
+          puts "summing #{number_with_index[0]} from row #{adjacent_row} for #{symbol}"
+          sum = sum * number_with_index[0]
+          count = count + 1
+          number_with_index[0] = number_with_index[0] * -1
+          break
+        end
+      end
+    end
+  end
+  if count == 2
+    return sum
+  end
+  return 0
+end
+
+puts number_map
+total_sum = 0
+symbol_map.each do |line_index, symbol_array|
+  puts "call #{line_index} for #{symbol_array}"
+  symbol_array.each do |symbol|
+    puts "for sybol #{symbol}"
+    total_sum = total_sum + adjacent_to_symbol_sum(symbol, line_index, number_map, total_lines)
+  end
+end
+
+puts total_sum
